@@ -1,3 +1,10 @@
+"""
+Backend API for the Sanctions Entity Explorer take-home assignment.
+
+This service loads the sanctions dataset, provides fuzzy entity search,
+and returns relation graphs for selected entities.
+"""
+
 import json
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -5,8 +12,10 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+# Create API server
 app = FastAPI(title="Sanctions Entity Explorer")
 
+# Allow frontend requests from the local React app.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -15,14 +24,17 @@ app.add_middleware(
 )
 
 _DATA_PATH = Path(__file__).parent.parent.parent / "data" / "sdn_sample.json"
+# Load the sanctions dataset once at application startup.
 with _DATA_PATH.open() as f:
     ENTITIES: list[dict] = json.load(f)
 
+# Fast lookup by entity id for graph requests.
 ENTITIES_BY_ID: dict[str, dict] = {e["id"]: e for e in ENTITIES}
 
 SCORE_THRESHOLD = 0.3
 
-
+# Simple heuristic:
+# exact match > substring match > fuzzy similarity
 def _score(entity: dict, query: str) -> float:
     """Score an entity against a search query. Returns a value in [0, 1]."""
     q = query.lower().strip()
@@ -43,7 +55,7 @@ def _score(entity: dict, query: str) -> float:
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
-
+# Search entities by name and aliases.
 @app.get("/api/search")
 def search(q: str = Query(min_length=1)) -> list[dict]:
     scored = [
@@ -58,6 +70,7 @@ def search(q: str = Query(min_length=1)) -> list[dict]:
         }
         for e in ENTITIES
     ]
+    # Filter weak matches and sort best results first.
     return sorted(
         [r for r in scored if r["score"] >= SCORE_THRESHOLD],
         key=lambda r: r["score"],
@@ -65,6 +78,7 @@ def search(q: str = Query(min_length=1)) -> list[dict]:
     )
 
 
+# Return graph data for a selected entity.
 @app.get("/api/entities/{entity_id}/graph")
 def get_entity_graph(entity_id: str) -> dict:
     entity = ENTITIES_BY_ID.get(entity_id)
@@ -74,6 +88,7 @@ def get_entity_graph(entity_id: str) -> dict:
     nodes = [{"id": entity["id"], "name": entity["name"], "type": entity["type"]}]
     edges = []
 
+    # Build neighbor nodes and edges from relations.
     for rel in entity["relations"]:
         neighbor = ENTITIES_BY_ID.get(rel["target_id"])
         if neighbor is None:

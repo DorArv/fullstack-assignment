@@ -61,10 +61,12 @@ function truncate(text: string, max: number): string {
 // --- GraphView ---
 
 function GraphView({ entityId, onBack }: { entityId: string; onBack: () => void }) {
+  
   const [data, setData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+ 
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -150,6 +152,12 @@ function GraphView({ entityId, onBack }: { entityId: string; onBack: () => void 
         </text>
       </svg>
 
+      {neighbors.length === 0 && (
+        <p style={{ color: "#888", marginTop: "0.75rem" }}>
+          No relations found for this entity in the dataset.
+        </p>
+      )}
+
       <div style={{ marginTop: "1rem", display: "flex", gap: "1.5rem", fontSize: "0.85rem", color: "#555" }}>
         {Object.entries(NODE_COLORS).map(([type, color]) => (
           <span key={type} style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -168,11 +176,13 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
+      setSearchError(null);
       return;
     }
 
@@ -183,8 +193,10 @@ export default function App() {
           `${API_BASE}/api/search?q=${encodeURIComponent(query)}`
         );
         setResults(await res.json());
+        setSearchError(null);
       } catch {
         setResults([]);
+        setSearchError("Search failed. Is the backend running?");
       } finally {
         setLoading(false);
       }
@@ -220,7 +232,11 @@ export default function App() {
             <p style={{ color: "#888", marginTop: "1rem" }}>Searching…</p>
           )}
 
-          {!loading && query.trim() && results.length === 0 && (
+          {searchError && (
+            <p style={{ color: "#c0392b", marginTop: "1rem" }}>{searchError}</p>
+          )}
+
+          {!loading && !searchError && query.trim() && results.length === 0 && (
             <p style={{ color: "#888", marginTop: "1rem" }}>No results for "{query}".</p>
           )}
 
