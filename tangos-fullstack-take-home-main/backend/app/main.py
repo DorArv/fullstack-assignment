@@ -2,7 +2,7 @@ import json
 from difflib import SequenceMatcher
 from pathlib import Path
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Sanctions Entity Explorer")
@@ -17,6 +17,8 @@ app.add_middleware(
 _DATA_PATH = Path(__file__).parent.parent.parent / "data" / "sdn_sample.json"
 with _DATA_PATH.open() as f:
     ENTITIES: list[dict] = json.load(f)
+
+ENTITIES_BY_ID: dict[str, dict] = {e["id"]: e for e in ENTITIES}
 
 SCORE_THRESHOLD = 0.3
 
@@ -61,3 +63,22 @@ def search(q: str = Query(min_length=1)) -> list[dict]:
         key=lambda r: r["score"],
         reverse=True,
     )
+
+
+@app.get("/api/entities/{entity_id}/graph")
+def get_entity_graph(entity_id: str) -> dict:
+    entity = ENTITIES_BY_ID.get(entity_id)
+    if entity is None:
+        raise HTTPException(status_code=404, detail="Entity not found")
+
+    nodes = [{"id": entity["id"], "name": entity["name"], "type": entity["type"]}]
+    edges = []
+
+    for rel in entity["relations"]:
+        neighbor = ENTITIES_BY_ID.get(rel["target_id"])
+        if neighbor is None:
+            continue
+        nodes.append({"id": neighbor["id"], "name": neighbor["name"], "type": neighbor["type"]})
+        edges.append({"source": entity["id"], "target": neighbor["id"], "type": rel["type"]})
+
+    return {"center_id": entity["id"], "nodes": nodes, "edges": edges}
