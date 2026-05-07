@@ -61,12 +61,10 @@ function truncate(text: string, max: number): string {
 // --- GraphView ---
 
 function GraphView({ entityId, onBack }: { entityId: string; onBack: () => void }) {
-  
   const [data, setData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
- 
   useEffect(() => {
     setLoading(true);
     setError(null);
